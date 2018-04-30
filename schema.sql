@@ -1,0 +1,6 @@
+BEGIN TRANSACTION;
+CREATE TABLE IF NOT EXISTS `stations` (
+	`name`	TEXT,
+	`url`	TEXT
+);
+COMMIT;
