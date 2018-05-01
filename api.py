@@ -59,7 +59,7 @@ class StationList(Resource):
         return query_db("select _rowid_ as _id, name, url from stations")
 
     def post(self):
-        station = parser.parse_args(strict=True)
+        station = parser.parse_args()
         query_db("insert into stations values (?, ?)", [station["name"], station["url"]])
         get_db().commit()
         station["_id"] = query_db("SELECT last_insert_rowid() as _id", one=True)["_id"]
@@ -79,7 +79,7 @@ class Station(Resource):
         return query_db("select changes() as n", one=True)
 
     def put(self, id):
-        args = parser.parse_args(strict=True)
+        args = parser.parse_args()
         query_db("update stations set name = ?, url = ? where _rowid_ = ?", [args["name"], args["url"], id])
         get_db().commit()
         return self.get(id)
