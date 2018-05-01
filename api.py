@@ -86,6 +86,7 @@ class Station(Resource):
 process = None
 selectedStation = None
 
+
 @app.route('/status')
 def status():
     global process
