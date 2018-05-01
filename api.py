@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 
-import sys
+import subprocess
 import sqlite3
-from flask import Flask, g
+from flask import Flask, g, jsonify
 from flask_restful import Api, Resource, abort, reqparse
 
 DATABASE = "database.sqlite"
@@ -83,7 +83,38 @@ class Station(Resource):
         return self.get(id)
 
 
+process = None
+
+
+@app.route('/status')
+def status():
+    global process
+    return jsonify({"isPlaying": process is not None, "selectedStation": None})
+
+
+@app.route('/stop')
+def stop():
+    global process
+    if process:
+        process.terminate()
+        process.poll()
+    return jsonify({})
+
+
+@app.route('/play/<int:id>')
+def play(id):
+    global process
+    resource = Station()
+    station = resource.get(id)
+    stop()
+    process = subprocess.Popen(
+        ["mplayer", station["url"]], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+    )
+    return jsonify(station)
+
+
 api.add_resource(StationList, "/stations")
 api.add_resource(Station, "/stations/<int:id>")
+
 if __name__ == "__main__":
-    app.run(debug=True, port=3000)
+    app.run(debug=True, host="0.0.0.0", port=3000)
