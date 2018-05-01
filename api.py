@@ -84,32 +84,38 @@ class Station(Resource):
 
 
 process = None
-
+selectedStation = None
 
 @app.route('/status')
 def status():
     global process
-    return jsonify({"isPlaying": process is not None, "selectedStation": None})
+    global selectedStation
+    return jsonify({"isPlaying": process is not None, "selectedStation": selectedStation})
 
 
 @app.route('/stop')
 def stop():
     global process
+    global selectedStation
     if process:
         process.terminate()
-        process.poll()
+        process.wait()
+        process = None
+        selectedStation = None
     return jsonify({})
 
 
 @app.route('/play/<int:id>')
 def play(id):
     global process
+    global selectedStation
     resource = Station()
     station = resource.get(id)
     stop()
     process = subprocess.Popen(
         ["mplayer", station["url"]], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
     )
+    selectedStation = station
     return jsonify(station)
 
 
