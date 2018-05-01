@@ -4,11 +4,13 @@ import subprocess
 import sqlite3
 from flask import Flask, g, jsonify
 from flask_restful import Api, Resource, abort, reqparse
+from flask_cors import CORS
 
 DATABASE = "database.sqlite"
 app = Flask(__name__)
 app.config["ERROR_404_HELP"] = False
 api = Api(app)
+CORS(app)
 
 
 def init_db():
