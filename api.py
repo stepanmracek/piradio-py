@@ -116,7 +116,7 @@ def stop():
         process.wait()
         process = None
         selectedStation = None
-        mqtt.publish("status", json.dumps(None), retain=True)
+        mqtt.publish("radio/status", json.dumps(None), retain=True)
     return jsonify({})
 
 
@@ -132,7 +132,7 @@ def play(id):
     )
     selectedStation = station
 
-    mqtt.publish("status", json.dumps(station), retain=True)
+    mqtt.publish("radio/status", json.dumps(station), retain=True)
 
     return jsonify(station)
 
@@ -140,6 +140,7 @@ def play(id):
 @mqtt.on_connect()
 def on_mqtt_connect(client, userdata, flags, rc):
     mqtt.subscribe("radio/play")
+    mqtt.subscribe("radio/stop")
     with app.app_context():
         publishStations()
 
