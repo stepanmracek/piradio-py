@@ -2,14 +2,18 @@
 
 import subprocess
 import sqlite3
+import json
 from flask import Flask, g, jsonify
 from flask_restful import Api, Resource, abort, reqparse
 from flask_cors import CORS
+from flask_mqtt import Mqtt
 
 DATABASE = "database.sqlite"
 app = Flask(__name__)
 app.config["ERROR_404_HELP"] = False
+app.config["MQTT_BROKER_URL"] = "127.0.0.1"
 api = Api(app)
+mqtt = Mqtt(app)
 CORS(app)
 
 
@@ -31,7 +35,6 @@ def get_db():
     if db is None:
         db = g.database = sqlite3.connect(DATABASE)
         db.row_factory = make_dicts
-        # init_db()
     return db
 
 
@@ -54,6 +57,11 @@ parser.add_argument("name", type=str, required=True)
 parser.add_argument("url", type=str, required=True)
 
 
+def publishStations():
+    stations = StationList()
+    mqtt.publish("radio/stations", json.dumps(stations.get()), retain=True)
+
+
 class StationList(Resource):
     def get(self):
         return query_db("select _rowid_ as _id, name, url from stations")
@@ -62,7 +70,8 @@ class StationList(Resource):
         station = parser.parse_args()
         query_db("insert into stations values (?, ?)", [station["name"], station["url"]])
         get_db().commit()
-        station["_id"] = query_db("SELECT last_insert_rowid() as _id", one=True)["_id"]
+        station["_id"] = query_db("select last_insert_rowid() as _id", one=True)["_id"]
+        publishStations()
         return station
 
 
@@ -76,12 +85,14 @@ class Station(Resource):
     def delete(self, id):
         query_db("delete from stations where _rowid_ = ?", [id])
         get_db().commit()
+        publishStations()
         return query_db("select changes() as n", one=True)
 
     def put(self, id):
         args = parser.parse_args()
         query_db("update stations set name = ?, url = ? where _rowid_ = ?", [args["name"], args["url"], id])
         get_db().commit()
+        publishStations()
         return self.get(id)
 
 
@@ -89,14 +100,14 @@ process = None
 selectedStation = None
 
 
-@app.route('/status')
+@app.route("/status")
 def status():
     global process
     global selectedStation
     return jsonify({"isPlaying": process is not None, "selectedStation": selectedStation})
 
 
-@app.route('/stop')
+@app.route("/stop")
 def stop():
     global process
     global selectedStation
@@ -105,10 +116,11 @@ def stop():
         process.wait()
         process = None
         selectedStation = None
+        mqtt.publish("status", json.dumps(None), retain=True)
     return jsonify({})
 
 
-@app.route('/play/<int:id>')
+@app.route("/play/<int:id>")
 def play(id):
     global process
     global selectedStation
@@ -119,11 +131,31 @@ def play(id):
         ["mplayer", station["url"]], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
     )
     selectedStation = station
+
+    mqtt.publish("status", json.dumps(station), retain=True)
+
     return jsonify(station)
+
+
+@mqtt.on_connect()
+def on_mqtt_connect(client, userdata, flags, rc):
+    mqtt.subscribe("radio/play")
+    with app.app_context():
+        publishStations()
+
+
+@mqtt.on_message()
+def on_mqtt_message(client, userdata, msg):
+    with app.app_context():
+        if msg.topic == "radio/play":
+            play(int(msg.payload.decode()))
+        elif msg.topic == "radio/stop":
+            stop()
 
 
 api.add_resource(StationList, "/stations")
 api.add_resource(Station, "/stations/<int:id>")
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=3000)
+    init_db()
+    app.run(debug=False, host="0.0.0.0", port=3000)
