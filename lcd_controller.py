@@ -32,7 +32,7 @@ def play(id):
         pass
 
 
-def update_menu_items():
+def get_menu_items():
     selected_id = None
     if status and "_id" in status:
         selected_id = status["_id"]
@@ -44,7 +44,7 @@ def update_menu_items():
         "name": ip,
         "action": None
     })
-    m.update_items(items)
+    return items
 
 
 def on_connect(client, userdata, flags, rc):
@@ -69,7 +69,7 @@ def on_message(client, userdata, msg):
     elif msg.topic == "radio/status":
         global status
         status = payload
-    update_menu_items()
+    menu.update_items(get_menu_items())
 
 
 class Menu(object):
@@ -125,7 +125,7 @@ client.connect("127.0.0.1")
 reader = ButtonReader(lcd)
 reader.start()
 
-m = Menu(reader, lcd, [])
+menu = Menu(reader, lcd, get_menu_items())
 # reader.join()
 
 client.loop_forever()
