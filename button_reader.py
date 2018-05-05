@@ -2,7 +2,7 @@ import threading
 import time
 import Adafruit_CharLCD as LCD
 
-DOWN = 0
+HOLD = 0
 PRESSED = 1
 RELASED = 2
 
@@ -19,16 +19,19 @@ class ButtonReader(threading.Thread):
             LCD.LEFT: False,
             LCD.RIGHT: False
         }
-        self.actions = {
-            LCD.SELECT: {DOWN: [], PRESSED: [], RELASED: []},
-            LCD.UP: {DOWN: [], PRESSED: [], RELASED: []},
-            LCD.DOWN: {DOWN: [], PRESSED: [], RELASED: []},
-            LCD.LEFT: {DOWN: [], PRESSED: [], RELASED: []},
-            LCD.RIGHT: {DOWN: [], PRESSED: [], RELASED: []}
-        }
+        self.clear_all_actions()
 
     def add_action(self, button, action, fun):
-        self.actions[button][action].append(fun)
+        self.actions[button][action] = (fun)
+
+    def clear_all_actions(self):
+        self.actions = {
+            LCD.SELECT: {HOLD: None, PRESSED: None, RELASED: None},
+            LCD.UP: {HOLD: None, PRESSED: None, RELASED: None},
+            LCD.DOWN: {HOLD: None, PRESSED: None, RELASED: None},
+            LCD.LEFT: {HOLD: None, PRESSED: None, RELASED: None},
+            LCD.RIGHT: {HOLD: None, PRESSED: None, RELASED: None}
+        }
 
     def run(self):
         while True:
@@ -37,11 +40,14 @@ class ButtonReader(threading.Thread):
                 pressed = self.lcd.is_pressed(button)
                 if pressed:
                     if not self.states[button]:
-                        for fun in self.actions[button][DOWN]:
-                            fun(button, DOWN)
-                    for fun in self.actions[button][PRESSED]:
-                        fun(button, PRESSED)
+                        fun = self.actions[button][PRESSED]
+                        if fun:
+                            fun(button, PRESSED)
+                    fun = self.actions[button][HOLD]
+                    if fun:
+                        fun(button, HOLD)
                 elif self.states[button]:
-                    for fun in self.actions[button][RELASED]:
+                    fun = self.actions[button][RELASED]
+                    if fun:
                         fun(button, RELASED)
                 self.states[button] = pressed
