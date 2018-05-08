@@ -4,8 +4,10 @@ import Adafruit_CharLCD as LCD
 import paho.mqtt.client as mqtt
 import json
 import requests
-from functools import partial
 import socket
+from functools import partial
+from os import system
+
 
 stations = []
 status = None
@@ -95,7 +97,7 @@ stationsContent = MenuContent([])
 
 systemContent = MenuContent([
     {"name": get_ip(), "action": None},
-    {"name": "Power off", "action": None}
+    {"name": "Power off", "action": partial(system, "sudo poweroff")}
 ])
 
 rootContent = MenuContent([
