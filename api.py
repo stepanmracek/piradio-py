@@ -7,6 +7,8 @@ from flask import Flask, g, jsonify
 from flask_restful import Api, Resource, abort, reqparse
 from flask_cors import CORS
 from flask_mqtt import Mqtt
+from flask_socketio import SocketIO
+
 
 DATABASE = "database.sqlite"
 app = Flask(__name__)
@@ -15,6 +17,7 @@ app.config["MQTT_BROKER_URL"] = "127.0.0.1"
 api = Api(app)
 mqtt = Mqtt(app)
 CORS(app)
+socketio = SocketIO(app)
 
 
 def init_db():
@@ -59,7 +62,14 @@ parser.add_argument("url", type=str, required=True)
 
 def publishStations():
     stations = StationList()
-    mqtt.publish("radio/stations", json.dumps(stations.get()), retain=True)
+    data = stations.get()
+    mqtt.publish("radio/stations", json.dumps(data), retain=True)
+    socketio.emit('stations', data=data,)
+
+
+def publishStatus(status):
+    mqtt.publish("radio/status", json.dumps(status), retain=True)
+    socketio.emit('status', data=status)
 
 
 class StationList(Resource):
@@ -102,9 +112,7 @@ selectedStation = None
 
 @app.route("/status")
 def status():
-    global process
-    global selectedStation
-    return jsonify({"isPlaying": process is not None, "selectedStation": selectedStation})
+    return jsonify(selectedStation)
 
 
 @app.route("/stop")
@@ -116,7 +124,7 @@ def stop():
         process.wait()
         process = None
         selectedStation = None
-    mqtt.publish("radio/status", json.dumps(None), retain=True)
+    publishStatus(None)
     return jsonify({})
 
 
@@ -131,9 +139,7 @@ def play(id):
         ["mplayer", station["url"]], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
     )
     selectedStation = station
-
-    mqtt.publish("radio/status", json.dumps(station), retain=True)
-
+    publishStatus(station)
     return jsonify(station)
 
 
@@ -160,4 +166,4 @@ api.add_resource(Station, "/stations/<int:id>")
 
 if __name__ == "__main__":
     init_db()
-    app.run(debug=False, host="0.0.0.0", port=3000)
+    socketio.run(app, host='0.0.0.0', port=3000)
