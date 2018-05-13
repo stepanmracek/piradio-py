@@ -4,12 +4,13 @@ import subprocess
 import sqlite3
 import json
 import base64
+import alsa_mixer
 from flask import Flask, g, jsonify
-from flask_restful import Api, Resource, abort, reqparse
+from flask_restful import Api, Resource, abort, reqparse, request
 from flask_cors import CORS
 from flask_mqtt import Mqtt
 from flask_socketio import SocketIO
-from flask_login import LoginManager, UserMixin, login_required, current_user, login_user
+from flask_login import LoginManager, UserMixin, login_required
 
 
 DATABASE = "database.sqlite"
@@ -74,9 +75,6 @@ def load_user_from_request(request):
         except TypeError:
             return None
         if user.check(key):
-            with app.app_context():
-                print("logging in user")
-            login_user(user)
             return user
     return None
 
@@ -141,6 +139,28 @@ class Station(Resource):
         get_db().commit()
         publishStations()
         return self.get(id)
+
+
+class Volume(Resource):
+    method_decorators = [login_required]
+
+    def __init__(self):
+        super(Resource, self).__init__()
+        self.parser = reqparse.RequestParser()
+        self.parser.add_argument("volume", type=int, required=True)
+
+    def get(self):
+        return alsa_mixer.get_volume()
+
+    def put(self):
+        args = self.parser.parse_args()
+        alsa_mixer.set_volume(args["volume"])
+
+    def post(self):
+        args = self.parser.parse_args()
+        with app.app_context():
+            print(args["volume"])
+        alsa_mixer.set_volume(args["volume"])
 
 
 process = None
@@ -213,6 +233,7 @@ def socketio_connect_handler():
 
 api.add_resource(StationList, "/stations")
 api.add_resource(Station, "/stations/<int:id>")
+api.add_resource(Volume, "/volume")
 
 if __name__ == "__main__":
     init_db()
