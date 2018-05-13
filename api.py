@@ -3,21 +3,25 @@
 import subprocess
 import sqlite3
 import json
+import base64
 from flask import Flask, g, jsonify
 from flask_restful import Api, Resource, abort, reqparse
 from flask_cors import CORS
 from flask_mqtt import Mqtt
 from flask_socketio import SocketIO
+from flask_login import LoginManager, UserMixin, login_required, current_user, login_user
 
 
 DATABASE = "database.sqlite"
 app = Flask(__name__)
 app.config["ERROR_404_HELP"] = False
 app.config["MQTT_BROKER_URL"] = "127.0.0.1"
+app.secret_key = "super secret key"
 api = Api(app)
 mqtt = Mqtt(app)
 CORS(app)
 socketio = SocketIO(app)
+login_manager = LoginManager()
 
 
 def init_db():
@@ -48,8 +52,37 @@ def query_db(query, args=(), one=False):
     return (rv[0] if rv else None) if one else rv
 
 
+class User(UserMixin):
+    def __init__(self, user_id, password):
+        super(User, self).__init__()
+        self.id = user_id
+        self.password = password
+
+    def check(self, key):
+        return key == self.password
+
+
+user = User(1, b'password123')
+
+
+@login_manager.request_loader
+def load_user_from_request(request):
+    api_key_b64 = request.headers.get('Api-Key')
+    if api_key_b64:
+        try:
+            key = base64.b64decode(api_key_b64)
+        except TypeError:
+            return None
+        if user.check(key):
+            with app.app_context():
+                print("logging in user")
+            login_user(user)
+            return user
+    return None
+
+
 @app.teardown_appcontext
-def close_connection(exception):
+def close_db_connection(exception):
     db = getattr(g, "database", None)
     if db is not None:
         db.close()
@@ -73,6 +106,8 @@ def publishStatus(status):
 
 
 class StationList(Resource):
+    method_decorators = [login_required]
+
     def get(self):
         return query_db("select _rowid_ as _id, name, url from stations")
 
@@ -86,6 +121,8 @@ class StationList(Resource):
 
 
 class Station(Resource):
+    method_decorators = [login_required]
+
     def get(self, id):
         station = query_db("select _rowid_ as _id, name, url from stations where _id = ?", [id], one=True)
         if not station:
@@ -111,12 +148,12 @@ selectedStation = None
 
 
 @app.route("/status")
+@login_required
 def status():
     return jsonify(selectedStation)
 
 
-@app.route("/stop")
-def stop():
+def stop_impl():
     global process
     global selectedStation
     if process:
@@ -128,13 +165,20 @@ def stop():
     return jsonify({})
 
 
+@app.route("/stop")
+@login_required
+def stop():
+    return stop_impl()
+
+
 @app.route("/play/<int:id>")
+@login_required
 def play(id):
     global process
     global selectedStation
     resource = Station()
     station = resource.get(id)
-    stop()
+    stop_impl()
     process = subprocess.Popen(
         ["mplayer", station["url"]], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
     )
@@ -149,7 +193,7 @@ def on_mqtt_connect(client, userdata, flags, rc):
     mqtt.subscribe("radio/stop")
     with app.app_context():
         publishStations()
-        stop()
+        stop_impl()
 
 
 @mqtt.on_message()
@@ -158,7 +202,13 @@ def on_mqtt_message(client, userdata, msg):
         if msg.topic == "radio/play":
             play(int(msg.payload.decode()))
         elif msg.topic == "radio/stop":
-            stop()
+            stop_impl()
+
+
+@socketio.on('connect')
+@login_required
+def socketio_connect_handler():
+    pass
 
 
 api.add_resource(StationList, "/stations")
@@ -166,4 +216,5 @@ api.add_resource(Station, "/stations/<int:id>")
 
 if __name__ == "__main__":
     init_db()
+    login_manager.init_app(app)
     socketio.run(app, host='0.0.0.0', port=3000)
