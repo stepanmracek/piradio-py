@@ -8,7 +8,7 @@ if len(simple_controls_match) > 0:
 else:
     control = None
 
-get_volume_re = re.compile(r".*: Playback \d+ \[(\d+)%\]")
+get_volume_re = re.compile(r".*: Playback -?\d+ \[(\d+)%\]")
 
 
 def set_volume(new_value: int):
