@@ -6,7 +6,7 @@ import json
 import base64
 import alsa_mixer
 from flask import Flask, g, jsonify
-from flask_restful import Api, Resource, abort, reqparse, request
+from flask_restful import Api, Resource, abort, reqparse
 from flask_cors import CORS
 from flask_mqtt import Mqtt
 from flask_socketio import SocketIO
