@@ -1,16 +1,18 @@
-from button_reader import ButtonReader, PRESSED
+from button_reader import ButtonReader
 from lcd_menu import MenuController, MenuContent
 import Adafruit_CharLCD as LCD
 import paho.mqtt.client as mqtt
 import json
 import requests
 import socket
+import base64
 from functools import partial
 from os import system
 
 
 stations = []
 status = None
+headers = {"Api-Key": base64.b64encode(b'password123')}
 
 
 def get_ip():
@@ -27,7 +29,7 @@ def get_ip():
 
 def play(id):
     try:
-        requests.get("http://127.0.0.1:3000/play/{}".format(id))
+        requests.get("http://127.0.0.1:3000/play/{}".format(id), headers=headers)
     except BaseException as e:
         print(e)
         pass
@@ -35,7 +37,21 @@ def play(id):
 
 def stop():
     try:
-        requests.get("http://127.0.0.1:3000/stop")
+        requests.get("http://127.0.0.1:3000/stop", headers=headers)
+    except BaseException as e:
+        print(e)
+
+
+def volume_set(shift):
+    try:
+        r = requests.get("http://127.0.0.1:3000/volume", headers=headers)
+        if r.status_code == 200:
+            v = r.json() + shift
+            if v < 0:
+                v = 0
+            if v > 100:
+                v = 100
+            requests.post("http://127.0.0.1:3000/volume", json={"volume": v}, headers=headers)
     except BaseException as e:
         print(e)
 
@@ -96,8 +112,10 @@ reader.start()
 stationsContent = MenuContent([])
 
 systemContent = MenuContent([
+    {"name": "Volume +", "action": partial(volume_set, 10)},
+    {"name": "Volume -", "action": partial(volume_set, -10)},
     {"name": get_ip(), "action": None},
-    {"name": "Power off", "action": partial(system, "sudo poweroff")}
+    {"name": "Power off", "action": partial(system, "sudo poweroff")},
 ])
 
 rootContent = MenuContent([
