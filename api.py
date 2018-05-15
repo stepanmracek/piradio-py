@@ -24,8 +24,8 @@ CORS(app)
 socketio = SocketIO(app)
 login_manager = LoginManager()
 
-api_key_file = open("api-key.txt", "rb")
-api_key = api_key_file.read()
+with open("api-key.txt", "rb") as api_key_file:
+    api_key = api_key_file.read()
 
 
 def init_db():

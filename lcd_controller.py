@@ -12,8 +12,8 @@ from os import system
 
 stations = []
 status = None
-api_key_file = open("api-key.txt", "rb")
-api_key = api_key_file.read()
+with open("api-key.txt", "rb") as api_key_file:
+    api_key = api_key_file.read()
 headers = {"Api-Key": base64.b64encode(api_key)}
 
 
