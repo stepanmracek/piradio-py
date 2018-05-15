@@ -1,0 +1,12 @@
+[Unit]
+Description=PiRadio LCD
+After=piradio-api.service
+Requires=piradio-api.service
+
+[Service]
+WorkingDirectory=/home/pi/git/piradio-py/
+ExecStart=/home/pi/git/piradio-py/env/bin/python lcd_controller.py
+
+[Install]
+WantedBy=multi-user.target
+
