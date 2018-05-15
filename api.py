@@ -24,6 +24,9 @@ CORS(app)
 socketio = SocketIO(app)
 login_manager = LoginManager()
 
+api_key_file = open("api-key.txt", "rb")
+api_key = api_key_file.read()
+
 
 def init_db():
     with app.app_context():
@@ -63,7 +66,7 @@ class User(UserMixin):
         return key == self.password
 
 
-user = User(1, b'password123')
+user = User(1, api_key)
 
 
 @login_manager.request_loader

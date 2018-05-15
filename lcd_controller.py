@@ -12,7 +12,9 @@ from os import system
 
 stations = []
 status = None
-headers = {"Api-Key": base64.b64encode(b'password123')}
+api_key_file = open("api-key.txt", "rb")
+api_key = api_key_file.read()
+headers = {"Api-Key": base64.b64encode(api_key)}
 
 
 def get_ip():
