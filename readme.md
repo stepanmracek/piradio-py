@@ -1,6 +1,6 @@
 # PiRadio Python server
 
-This is Pytho server for my PyRadio project - Internet radio player for Raspberry Pi.
+This is Python server for my PyRadio project - Internet radio player for Raspberry Pi.
 
 This repository contains two services for Raspbery Pi
 1. API: Core service - Internet radio player with [MQTT](http://mqtt.org/), [REST](https://en.wikipedia.org/wiki/Representational_state_transfer) and [Socket.IO](https://socket.io/) interface
