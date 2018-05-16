@@ -71,7 +71,7 @@ user = User(1, api_key)
 
 @login_manager.request_loader
 def load_user_from_request(request):
-    api_key_b64 = request.headers.get('Api-Key')
+    api_key_b64 = request.headers.get("Api-Key")
     if api_key_b64:
         try:
             key = base64.b64decode(api_key_b64)
@@ -98,12 +98,12 @@ def publishStations():
     stations = StationList()
     data = stations.get()
     mqtt.publish("radio/stations", json.dumps(data), retain=True)
-    socketio.emit('stations', data=data,)
+    socketio.emit("stations", data=data,)
 
 
 def publishStatus(status):
     mqtt.publish("radio/status", json.dumps(status), retain=True)
-    socketio.emit('status', data=status)
+    socketio.emit("status", data=status)
 
 
 class StationList(Resource):
@@ -228,7 +228,7 @@ def on_mqtt_message(client, userdata, msg):
             stop_impl()
 
 
-@socketio.on('connect')
+@socketio.on("connect")
 @login_required
 def socketio_connect_handler():
     pass
@@ -241,4 +241,4 @@ api.add_resource(Volume, "/volume")
 if __name__ == "__main__":
     init_db()
     login_manager.init_app(app)
-    socketio.run(app, host='0.0.0.0', port=3000)
+    socketio.run(app, host="0.0.0.0", port=3000)
