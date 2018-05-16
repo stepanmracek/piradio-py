@@ -106,6 +106,11 @@ def publishStatus(status):
     socketio.emit("status", data=status)
 
 
+def publishVolume(volume):
+    mqtt.publish("radio/volume", volume, retain=True)
+    socketio.emit("volume", data=volume)
+
+
 class StationList(Resource):
     method_decorators = [login_required]
 
@@ -157,13 +162,12 @@ class Volume(Resource):
 
     def put(self):
         args = self.parser.parse_args()
-        alsa_mixer.set_volume(args["volume"])
+        volume = args["volume"]
+        alsa_mixer.set_volume(volume)
+        publishVolume(volume)
 
     def post(self):
-        args = self.parser.parse_args()
-        with app.app_context():
-            print(args["volume"])
-        alsa_mixer.set_volume(args["volume"])
+        self.put()
 
 
 process = None
@@ -217,6 +221,7 @@ def on_mqtt_connect(client, userdata, flags, rc):
     with app.app_context():
         publishStations()
         stop_impl()
+        publishVolume(alsa_mixer.get_volume())
 
 
 @mqtt.on_message()
