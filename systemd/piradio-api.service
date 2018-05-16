@@ -8,5 +8,5 @@ WorkingDirectory=/home/pi/git/piradio-py/
 ExecStart=/home/pi/git/piradio-py/env/bin/python api.py
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=network.target
 
