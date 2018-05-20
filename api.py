@@ -5,6 +5,7 @@ import json
 import base64
 import alsa_mixer
 import player
+from publisher import Publisher
 from flask import Flask, g, jsonify
 from flask_restful import Api, Resource, abort, reqparse
 from flask_cors import CORS
@@ -22,6 +23,7 @@ api = Api(app)
 mqtt = Mqtt(app)
 CORS(app)
 socketio = SocketIO(app)
+publisher = Publisher(mqtt, socketio)
 login_manager = LoginManager()
 
 with open("api-key.txt", "rb") as api_key_file:
@@ -94,23 +96,6 @@ parser.add_argument("name", type=str, required=True)
 parser.add_argument("url", type=str, required=True)
 
 
-def publishStations():
-    stations = StationList()
-    data = stations.get()
-    mqtt.publish("radio/stations", json.dumps(data), retain=True)
-    socketio.emit("stations", data=data,)
-
-
-def publishStatus(status):
-    mqtt.publish("radio/status", json.dumps(status), retain=True)
-    socketio.emit("status", data=status)
-
-
-def publishVolume(volume):
-    mqtt.publish("radio/volume", volume, retain=True)
-    socketio.emit("volume", data=volume)
-
-
 class StationList(Resource):
     method_decorators = [login_required]
 
@@ -122,7 +107,7 @@ class StationList(Resource):
         query_db("insert into stations values (?, ?)", [station["name"], station["url"]])
         get_db().commit()
         station["_id"] = query_db("select last_insert_rowid() as _id", one=True)["_id"]
-        publishStations()
+        publisher.publishStations(StationList().get())
         return station
 
 
@@ -138,14 +123,14 @@ class Station(Resource):
     def delete(self, id):
         query_db("delete from stations where _rowid_ = ?", [id])
         get_db().commit()
-        publishStations()
+        publisher.publishStations(StationList().get())
         return query_db("select changes() as n", one=True)
 
     def put(self, id):
         args = parser.parse_args()
         query_db("update stations set name = ?, url = ? where _rowid_ = ?", [args["name"], args["url"], id])
         get_db().commit()
-        publishStations()
+        publisher.publishStations(StationList().get())
         return self.get(id)
 
 
@@ -164,7 +149,7 @@ class Volume(Resource):
         args = self.parser.parse_args()
         volume = args["volume"]
         alsa_mixer.set_volume(volume)
-        publishVolume(volume)
+        publisher.publishVolume(volume)
 
     def post(self):
         self.put()
@@ -178,7 +163,7 @@ def status():
 
 def stop_impl():
     player.stop()
-    publishStatus(None)
+    publisher.publishStatus(None)
     return jsonify({})
 
 
@@ -194,7 +179,7 @@ def play(id):
     resource = Station()
     station = resource.get(id)
     player.play(station)
-    publishStatus(station)
+    publisher.publishStatus(station)
     return jsonify(station)
 
 
@@ -203,9 +188,9 @@ def on_mqtt_connect(client, userdata, flags, rc):
     mqtt.subscribe("radio/play")
     mqtt.subscribe("radio/stop")
     with app.app_context():
-        publishStations()
+        publisher.publishStations(StationList().get())
         stop_impl()
-        publishVolume(alsa_mixer.get_volume())
+        publisher.publishVolume(alsa_mixer.get_volume())
 
 
 @mqtt.on_message()
