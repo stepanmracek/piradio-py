@@ -191,7 +191,7 @@ api.add_resource(Station, "/stations/<int:id>")
 api.add_resource(Volume, "/volume")
 
 @app.route('/')
-def hello():
+def index():
     return redirect('static/index.html')
 
 if __name__ == "__main__":
