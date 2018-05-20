@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 import sqlite3
-import json
 import base64
 import alsa_mixer
 import player
