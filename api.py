@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 
-import subprocess
 import sqlite3
 import json
 import base64
 import alsa_mixer
+import player
 from flask import Flask, g, jsonify
 from flask_restful import Api, Resource, abort, reqparse
 from flask_cors import CORS
@@ -170,24 +170,14 @@ class Volume(Resource):
         self.put()
 
 
-process = None
-selectedStation = None
-
-
 @app.route("/status")
 @login_required
 def status():
-    return jsonify(selectedStation)
+    return jsonify(player.selected_station)
 
 
 def stop_impl():
-    global process
-    global selectedStation
-    if process:
-        process.terminate()
-        process.wait()
-        process = None
-        selectedStation = None
+    player.stop()
     publishStatus(None)
     return jsonify({})
 
@@ -201,15 +191,9 @@ def stop():
 @app.route("/play/<int:id>")
 @login_required
 def play(id):
-    global process
-    global selectedStation
     resource = Station()
     station = resource.get(id)
-    stop_impl()
-    process = subprocess.Popen(
-        ["mplayer", station["url"]], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-    )
-    selectedStation = station
+    player.play(station)
     publishStatus(station)
     return jsonify(station)
 
