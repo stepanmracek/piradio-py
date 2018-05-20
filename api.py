@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 
-import sqlite3
 import base64
 import alsa_mixer
 import player
+import db
 from publisher import Publisher
 from flask import Flask, g, jsonify
 from flask_restful import Api, Resource, abort, reqparse
@@ -13,7 +13,6 @@ from flask_socketio import SocketIO
 from flask_login import LoginManager, UserMixin, login_required
 
 
-DATABASE = "database.sqlite"
 app = Flask(__name__)
 app.config["ERROR_404_HELP"] = False
 app.config["MQTT_BROKER_URL"] = "127.0.0.1"
@@ -27,34 +26,6 @@ login_manager = LoginManager()
 
 with open("api-key.txt", "rb") as api_key_file:
     api_key = api_key_file.read()
-
-
-def init_db():
-    with app.app_context():
-        db = get_db()
-        with app.open_resource("schema.sql", mode="r") as f:
-            db.cursor().executescript(f.read())
-        db.commit()
-
-
-def make_dicts(cursor, row):
-    return dict((cursor.description[idx][0], value)
-                for idx, value in enumerate(row))
-
-
-def get_db():
-    db = getattr(g, "database", None)
-    if db is None:
-        db = g.database = sqlite3.connect(DATABASE)
-        db.row_factory = make_dicts
-    return db
-
-
-def query_db(query, args=(), one=False):
-    cur = get_db().execute(query, args)
-    rv = cur.fetchall()
-    cur.close()
-    return (rv[0] if rv else None) if one else rv
 
 
 class User(UserMixin):
@@ -85,27 +56,31 @@ def load_user_from_request(request):
 
 @app.teardown_appcontext
 def close_db_connection(exception):
-    db = getattr(g, "database", None)
-    if db is not None:
-        db.close()
+    db.close()
 
 
-parser = reqparse.RequestParser()
-parser.add_argument("name", type=str, required=True)
-parser.add_argument("url", type=str, required=True)
+def get_station_parser():
+    station_parser = reqparse.RequestParser()
+    station_parser.add_argument("name", type=str, required=True)
+    station_parser.add_argument("url", type=str, required=True)
+    return station_parser
 
 
 class StationList(Resource):
     method_decorators = [login_required]
 
+    def __init__(self):
+        super(StationList, self).__init__()
+        self.station_parser = get_station_parser()
+
     def get(self):
-        return query_db("select _rowid_ as _id, name, url from stations")
+        return db.query("select _rowid_ as _id, name, url from stations")
 
     def post(self):
-        station = parser.parse_args()
-        query_db("insert into stations values (?, ?)", [station["name"], station["url"]])
-        get_db().commit()
-        station["_id"] = query_db("select last_insert_rowid() as _id", one=True)["_id"]
+        station = self.station_parser.parse_args()
+        db.query("insert into stations values (?, ?)", [station["name"], station["url"]])
+        db.get().commit()
+        station["_id"] = db.query("select last_insert_rowid() as _id", one=True)["_id"]
         publisher.publishStations(StationList().get())
         return station
 
@@ -113,22 +88,26 @@ class StationList(Resource):
 class Station(Resource):
     method_decorators = [login_required]
 
+    def __init__(self):
+        super(Station, self).__init__()
+        self.station_parser = get_station_parser()
+
     def get(self, id):
-        station = query_db("select _rowid_ as _id, name, url from stations where _id = ?", [id], one=True)
+        station = db.query("select _rowid_ as _id, name, url from stations where _id = ?", [id], one=True)
         if not station:
             abort(404, message="station {} not found".format(id))
         return station
 
     def delete(self, id):
-        query_db("delete from stations where _rowid_ = ?", [id])
-        get_db().commit()
+        db.query("delete from stations where _rowid_ = ?", [id])
+        db.get().commit()
         publisher.publishStations(StationList().get())
-        return query_db("select changes() as n", one=True)
+        return db.query("select changes() as n", one=True)
 
     def put(self, id):
-        args = parser.parse_args()
-        query_db("update stations set name = ?, url = ? where _rowid_ = ?", [args["name"], args["url"], id])
-        get_db().commit()
+        args = self.station_parser.parse_args()
+        db.query("update stations set name = ?, url = ? where _rowid_ = ?", [args["name"], args["url"], id])
+        db.get().commit()
         publisher.publishStations(StationList().get())
         return self.get(id)
 
@@ -212,6 +191,6 @@ api.add_resource(Station, "/stations/<int:id>")
 api.add_resource(Volume, "/volume")
 
 if __name__ == "__main__":
-    init_db()
+    db.init(app)
     login_manager.init_app(app)
     socketio.run(app, host="0.0.0.0", port=3000)
