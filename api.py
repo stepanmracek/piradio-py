@@ -5,7 +5,7 @@ import alsa_mixer
 import player
 import db
 from publisher import Publisher
-from flask import Flask, g, jsonify
+from flask import Flask, jsonify
 from flask_restful import Api, Resource, abort, reqparse
 from flask_cors import CORS
 from flask_mqtt import Mqtt
