@@ -5,7 +5,7 @@ import alsa_mixer
 import player
 import db
 from publisher import Publisher
-from flask import Flask, jsonify
+from flask import Flask, jsonify, redirect
 from flask_restful import Api, Resource, abort, reqparse
 from flask_cors import CORS
 from flask_mqtt import Mqtt
@@ -189,6 +189,10 @@ def socketio_connect_handler():
 api.add_resource(StationList, "/stations")
 api.add_resource(Station, "/stations/<int:id>")
 api.add_resource(Volume, "/volume")
+
+@app.route('/')
+def hello():
+    return redirect('static/index.html')
 
 if __name__ == "__main__":
     db.init(app)
